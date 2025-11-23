@@ -147,3 +147,10 @@ def calculate():
 if __name__ == '__main__':
     # Default run on http://127.0.0.1:5000/
     app.run(debug=True)
+
+
+
+@app.route('/')
+def health_check():
+    # 返回一个简单的 JSON 响应，确认服务正常运行
+    return jsonify({'status': 'API Running', 'version': '1.0'})
