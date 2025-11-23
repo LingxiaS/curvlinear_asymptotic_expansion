@@ -66,13 +66,13 @@ The basis vectors are $\\mathbf{n}$ (normal) and $\\mathbf{s}$ (tangential).
 
 
 # FIX: Corrected LaTeX display for headings
-st.subheader("Curvilinear Gradient ($\nabla \\phi$):")
+st.subheader("Curvilinear Gradient:")
 st.latex(r'''
 \nabla \phi = \mathbf{n} \left(\frac{1}{\epsilon}\frac{\partial \phi}{\partial \rho}\right) + \mathbf{s} \left(\frac{1}{1 + \epsilon \rho K}\frac{\partial \phi}{\partial s}\right)
 ''')
 
 # FIX: Corrected LaTeX display for headings
-st.subheader("Curvilinear Divergence ($\nabla \cdot \mathbf{V}$):")
+st.subheader("Curvilinear Divergence:")
 st.latex(r'''
 \nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{1}{1 + \epsilon \rho K} \left( \frac{\partial V_s}{\partial s} + K V_n \right)
 ''')
@@ -287,7 +287,7 @@ This demo replicates a common use case where the variable $H$ is expanded up to 
 **Inputs used in this example:**
 * **Variable Name:** H
 * **Variable Type:** Scalar
-* **Operator:** Laplacian ($\nabla^2$) 
+* **Operator:** Laplacian 
 * **Expansion Order:** 2
 * **Expansion Terms:** `K(s)`, `-rho * K(s)**2` (i.e., $H_0 = K(s)$, $H_1 = -\\rho K(s)^2$)
 """)
