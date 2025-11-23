@@ -158,6 +158,40 @@ if do_variable_expansion:
     except Exception:
         pass 
 
+# --- Helper function for sorting (Ascending Power of Epsilon) ---
+
+def sort_by_epsilon_power(expr, epsilon, max_order):
+    """
+    Sorts a SymPy expression by the ascending power of epsilon 
+    by explicitly collecting and re-summing terms.
+    """
+    if expr == 0:
+        return sp.sympify(0)
+        
+    terms = {}
+    
+    # 1. Collect terms into a dictionary based on power of epsilon
+    # The exponent is the key, the coefficient is the value
+    for i in range(-1, max_order + 1):
+        coeff = sp.collect(expr, epsilon**i).coeff(epsilon**i)
+        
+        # If the term contains epsilon, it means it's a higher order term that 
+        # needs further processing or is residual noise from earlier stages.
+        # We only keep terms whose coefficient does not contain epsilon.
+        if epsilon not in coeff.free_symbols:
+            if coeff != 0:
+                terms[i] = coeff
+        
+    # 2. Reconstruct the expression in ascending order of power
+    sorted_expr = sp.sympify(0)
+    
+    # Get sorted list of powers (e.g., -1, 0, 1, 2)
+    sorted_powers = sorted(terms.keys())
+    
+    for power in sorted_powers:
+        sorted_expr += terms[power] * (epsilon ** power)
+        
+    return sorted_expr
 
 # --- Core Execution Function ---
 
@@ -223,24 +257,24 @@ def execute_calculation(
     # Truncate at O(eps^(order+1))
     final_result_truncated = result_expr.subs(sp.Order(epsilon**(order + 1)), 0)
     
-    # Use sp.Poly().as_expr() to force ascending order (constant term first)
+    # Force ascending order by splitting and sorting terms
     try:
         # Separate the n_vec and s_vec parts if present
         if n_vec in final_result_truncated.free_symbols or s_vec in final_result_truncated.free_symbols:
-            n_part = sp.collect(final_result_truncated, n_vec).coeff(n_vec)
-            s_part = sp.collect(final_result_truncated, s_vec).coeff(s_vec)
+            n_part_expr = sp.collect(final_result_truncated, n_vec).coeff(n_vec)
+            s_part_expr = sp.collect(final_result_truncated, s_vec).coeff(s_vec)
             
             # Sort each part separately by epsilon power
-            n_sorted = sp.Poly(n_part.expand(), epsilon).as_expr()
-            s_sorted = sp.Poly(s_part.expand(), epsilon).as_expr()
+            n_sorted = sort_by_epsilon_power(n_part_expr.expand(), epsilon, order)
+            s_sorted = sort_by_epsilon_power(s_part_expr.expand(), epsilon, order)
             
             sorted_result = n_vec * n_sorted + s_vec * s_sorted
         else:
             # For scalar results, sort directly by epsilon power
-            sorted_result = sp.Poly(final_result_truncated.expand(), epsilon).as_expr()
+            sorted_result = sort_by_epsilon_power(final_result_truncated.expand(), epsilon, order)
             
     except Exception:
-        # Fallback if Poly conversion fails (e.g., if result is zero)
+        # Fallback if sorting fails
         sorted_result = final_result_truncated
     
     return op_symbol, sp.latex(sorted_result), order
@@ -312,10 +346,7 @@ ex_lap_H = curvilinear_laplacian(ex_H_expanded, ex_n_vec, ex_s_vec, ex_epsilon, 
 ex_lap_H_final_truncated = ex_lap_H.subs(sp.Order(ex_epsilon**3), 0)
 
 # FIX: Force ascending order sorting for example result
-try:
-    ex_lap_H_final_sorted = sp.Poly(ex_lap_H_final_truncated.expand(), ex_epsilon).as_expr()
-except Exception:
-    ex_lap_H_final_sorted = ex_lap_H_final_truncated
+ex_lap_H_final_sorted = sort_by_epsilon_power(ex_lap_H_final_truncated.expand(), ex_epsilon, 2)
 
 st.subheader("Result for $\\nabla^2 H$:")
 # Append O(eps^3) to the example result display
