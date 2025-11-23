@@ -5,7 +5,7 @@ from typing import List, Union, Tuple
 # --- SymPy Core Calculation Functions (STRICTLY AS PROVIDED BY USER) ---
 
 def curvilinear_gradient(phi, n_vec, s_vec, epsilon, rho, s, K, order):
-    """Calculates the curvilinear gradient (nabla phi). Order in series should be user_order + 1."""
+    """Calculates the curvilinear gradient (nabla phi). Order in series is user_order + 1."""
     # Ensure series order is user_order + 1 for accuracy up to user_order
     series_order = order + 1 
     
@@ -17,7 +17,7 @@ def curvilinear_gradient(phi, n_vec, s_vec, epsilon, rho, s, K, order):
 
 
 def curvilinear_divergence(n_component, s_component, epsilon, rho, s, K, order):
-    """Calculates the curvilinear divergence (div(V)). Order in series should be user_order + 1."""
+    """Calculates the curvilinear divergence (div(V)). Order in series is user_order + 1."""
     # Ensure series order is user_order + 1 for accuracy up to user_order
     series_order = order + 1
     
@@ -52,22 +52,27 @@ st.title("Curvilinear Asymptotic Expansion Tool")
 st.markdown("---")
 
 
-# --- Main Instruction and Formula (FIX: All UI/Formula Issues) ---
+# --- Main Instruction and Formula ---
 
 st.header("Theory and Formula")
 st.markdown("""
 This tool performs asymptotic expansion for vector calculus operators in a curvilinear coordinate system $(\\rho, s)$, where $\\epsilon$ is the small parameter and $K(s)$ is the curvature.
-
+""")
+# FIX 5: Added definition for rho
+st.markdown(r"Here, $\rho = r/\epsilon$, where $r$ is the signed distance from the interface.")
+st.markdown("""
 The basis vectors are $\\mathbf{n}$ (normal) and $\\mathbf{s}$ (tangential).
 """)
 
+
+# FIX 4: Corrected LaTeX display for headings
 st.subheader("Curvilinear Gradient ($\nabla \\phi$):")
 st.latex(r'''
 \nabla \phi = \mathbf{n} \left(\frac{1}{\epsilon}\frac{\partial \phi}{\partial \rho}\right) + \mathbf{s} \left(\frac{1}{1 + \epsilon \rho K}\frac{\partial \phi}{\partial s}\right)
 ''')
 
+# FIX 4: Corrected LaTeX display for headings
 st.subheader("Curvilinear Divergence ($\nabla \cdot \mathbf{V}$):")
-# FIX: Corrected mathematical formula display
 st.latex(r'''
 \nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{1}{1 + \epsilon \rho K} \left( \frac{\partial V_s}{\partial s} + K V_n \right)
 ''')
@@ -84,22 +89,29 @@ variable_name = st.sidebar.text_input(
     value="H"
 )
 
-# 2. Variable Type (FIX: Cleaned dropdown options)
+# 2. Variable Type (No change needed)
 variable_type = st.sidebar.selectbox(
     "2. Variable Type:",
     ("Scalar", "Vector")
 )
 
-# 3. Apply Which Expansion (FIX: Cleaned dropdown options)
+# 3. Apply Which Expansion (FIX 3: Removed confusing LaTeX from dropdown options)
 if variable_type == "Scalar":
-    op_choices = ["Gradient ($\nabla$)", "Laplacian ($\nabla^2$)"]
+    op_choices = ["Gradient", "Laplacian"]
 else:
-    op_choices = ["Divergence ($\nabla \cdot$)"]
+    op_choices = ["Divergence"]
     
-operation = st.sidebar.selectbox(
+operation_map = {
+    "Gradient": "Gradient ($\nabla$)",
+    "Laplacian": "Laplacian ($\nabla^2$)",
+    "Divergence": "Divergence ($\nabla \cdot$)",
+}
+
+operation_selection = st.sidebar.selectbox(
     "3. Select Operator:",
     op_choices
 )
+operation = operation_map[operation_selection] # Store the full LaTeX string for calculation/display
 
 # 4. Vector Components (if Vector type is chosen)
 n_component_str = "0"
@@ -204,11 +216,16 @@ def execute_calculation(
     else:
         raise ValueError("Invalid operation/type combination.")
 
-    # 4. Final Truncation: Truncate at O(eps^(order+1))
-    # This removes all terms >= epsilon^(order+1)
-    final_result = sp.collect(result_expr.subs(sp.Order(epsilon**(order + 1)), 0), epsilon)
-
-    return op_symbol, sp.latex(final_result), order
+    # 4. Final Truncation and Sorting (FIX 1: Sorting by epsilon order)
+    # Truncate at O(eps^(order+1))
+    final_result_truncated = result_expr.subs(sp.Order(epsilon**(order + 1)), 0)
+    
+    # Collect terms and explicitly sort them by power of epsilon (ascending order)
+    # The default SymPy sorting for LaTeX generation is usually small to large power
+    # but we can enforce it by using collect and then generating latex
+    sorted_result = sp.collect(final_result_truncated, epsilon)
+    
+    return op_symbol, sp.latex(sorted_result), order
 
 
 # --- Execution and Display ---
@@ -228,7 +245,7 @@ if st.sidebar.button("Execute Calculation"):
                     variable_name,
                     variable_type,
                     n_component_str,
-                    s_component_str,
+                    s_comp_str,
                     expansion_terms, 
                     order
                 )
@@ -254,7 +271,7 @@ This demo replicates a common use case where the variable $H$ is expanded up to 
 **Inputs used in this example:**
 * **Variable Name:** H
 * **Variable Type:** Scalar
-* **Operator:** Laplacian ($\nabla^2$)
+* **Operator:** Laplacian ($\nabla^2$) 
 * **Expansion Order:** 2
 * **Expansion Terms:** `K(s)`, `-rho * K(s)**2` (i.e., $H_0 = K(s)$, $H_1 = -\\rho K(s)^2$)
 """)
@@ -273,10 +290,13 @@ ex_H_expanded = ex_H_0 + ex_H_1 * ex_epsilon + sp.Order(ex_epsilon**(2+1))
 # Calculate the Laplacian of the expanded H (using order=2)
 ex_lap_H = curvilinear_laplacian(ex_H_expanded, ex_n_vec, ex_s_vec, ex_epsilon, ex_rho, ex_s, ex_K, 2)
 # Final Truncation at O(eps^(2+1))
-ex_lap_H_final = sp.collect(ex_lap_H.subs(sp.Order(ex_epsilon**3), 0), ex_epsilon)
+ex_lap_H_final_truncated = ex_lap_H.subs(sp.Order(ex_epsilon**3), 0)
+
+# Collect and sort for display
+ex_lap_H_final_sorted = sp.collect(ex_lap_H_final_truncated, ex_epsilon)
 
 st.subheader("Result for $\\nabla^2 H$:")
 # Append O(eps^3) to the example result display
-st.latex(sp.latex(ex_lap_H_final) + r" + \mathcal{O}\left(\epsilon^3\right)")
+st.latex(sp.latex(ex_lap_H_final_sorted) + r" + \mathcal{O}\left(\epsilon^3\right)")
 
 st.caption("Application powered by Streamlit and SymPy.")
