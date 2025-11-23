@@ -133,7 +133,7 @@ if variable_type == "Vector":
 order = st.sidebar.number_input(
     "4. Expansion Order (n, result up to $\\epsilon^n$):",
     min_value=0,
-    value=2
+    value=1
 )
 
 # 6. Variable Expansion 
