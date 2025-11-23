@@ -95,6 +95,10 @@ variable_type = st.sidebar.selectbox(
     ("Scalar", "Vector")
 )
 
+# FIX: Initialize components outside of the 'if' block to avoid NameError
+n_component_str = "0"
+s_component_str = "0"
+
 # 3. Apply Which Expansion (FIX 3: Removed confusing LaTeX from dropdown options)
 if variable_type == "Scalar":
     op_choices = ["Gradient", "Laplacian"]
@@ -114,8 +118,6 @@ operation_selection = st.sidebar.selectbox(
 operation = operation_map[operation_selection] # Store the full LaTeX string for calculation/display
 
 # 4. Vector Components (if Vector type is chosen)
-n_component_str = "0"
-s_component_str = "0"
 if variable_type == "Vector":
     st.sidebar.subheader("Vector Components")
     n_component_str = st.sidebar.text_input(
@@ -221,8 +223,7 @@ def execute_calculation(
     final_result_truncated = result_expr.subs(sp.Order(epsilon**(order + 1)), 0)
     
     # Collect terms and explicitly sort them by power of epsilon (ascending order)
-    # The default SymPy sorting for LaTeX generation is usually small to large power
-    # but we can enforce it by using collect and then generating latex
+    # The default SymPy collect/latex should now output in ascending order (small to large power)
     sorted_result = sp.collect(final_result_truncated, epsilon)
     
     return op_symbol, sp.latex(sorted_result), order
@@ -233,6 +234,7 @@ def execute_calculation(
 st.subheader("Result")
 
 if st.sidebar.button("Execute Calculation"):
+    # Check for empty components only if Variable Type is Vector
     if variable_type == "Vector" and not (n_component_str or s_component_str):
          st.warning("Please define at least one vector component ($V_n$ or $V_s$).")
     elif not variable_name:
@@ -245,7 +247,7 @@ if st.sidebar.button("Execute Calculation"):
                     variable_name,
                     variable_type,
                     n_component_str,
-                    s_comp_str,
+                    s_component_str,
                     expansion_terms, 
                     order
                 )
