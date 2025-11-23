@@ -4,7 +4,10 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 # Enable Cross-Origin Resource Sharing (CORS) for the frontend
-CORS(app)
+#CORS(app)
+# Explicitly configure CORS: allow all origins ("*") to access all routes (resources={r"/*"})
+CORS(app, resources={r"/*": {"origins": "*"}}) 
+app.config['CORS_HEADERS'] = 'Content-Type'
 
 # --- Core Calculus Functions ---
 
@@ -152,5 +155,5 @@ if __name__ == '__main__':
 
 @app.route('/')
 def health_check():
-    # 返回一个简单的 JSON 响应，确认服务正常运行
+    # Return a simple JSON response to confirm the service is running
     return jsonify({'status': 'API Running', 'version': '1.0'})
