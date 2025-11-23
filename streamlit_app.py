@@ -1,5 +1,6 @@
 import streamlit as st
 import sympy as sp
+from typing import List, Union
 
 # --- Streamlit Page Configuration ---
 st.set_page_config(page_title="Curvilinear Asymptotic Expansion Tool", layout="wide")
@@ -15,13 +16,13 @@ method = st.sidebar.selectbox(
     ("Laplacian", "CurvilinearDerivative")
 )
 
-# 2. Variable Symbol (H)
+# 2. Variable Symbol
 variable_symbol_str = st.sidebar.text_input(
     "2. Variable Symbol (e.g., H):",
     value="H"
 )
 
-# 3. Expansion Variables (K(s) and -rho*K(s)**2)
+# 3 & 4. Expansion Terms
 use_expansion = st.sidebar.checkbox("3. Use Expansion Variables", True)
 expansion_terms_str = st.sidebar.text_area(
     "4. Expansion Terms (comma-separated, e.g., K(s), -rho*K(s)**2):",
@@ -36,20 +37,22 @@ order = st.sidebar.number_input(
     value=2
 )
 
-# 6. Components and Symbols (sComponent, cComponent)
+# 6. Components and Symbols
 s_component_str = st.sidebar.text_input("sComponent Symbol (e.g., s):", value="s")
 c_component_str = st.sidebar.text_input("cComponent Symbol (e.g., c):", value="c")
 
-# 7. SymPy Symbol Definition
+
+# --- Symbol Definition and Parsing ---
+
 try:
     # Define necessary SymPy symbols
     s, c, rho = sp.symbols(f'{s_component_str} {c_component_str} rho')
     
     # Parse expansion terms
     if use_expansion and expansion_terms_str:
-        expansion_terms_list = [sp.sympify(t.strip()) for t in expansion_terms_str.split(',')]
+        expansion_terms_list: List[sp.Expr] = [sp.sympify(t.strip()) for t in expansion_terms_str.split(',')]
     else:
-        expansion_terms_list = []
+        expansion_terms_list: List[sp.Expr] = []
 
     variable_symbol = sp.Symbol(variable_symbol_str)
 
@@ -58,25 +61,48 @@ except Exception as e:
     st.stop()
 
 
-# --- Calculation Logic (Replace this with your original logic) ---
+# --- Calculation Logic ---
 
 @st.cache_data
-def execute_calculation(method, variable, expansion_terms, order):
-    # NOTE: You MUST replace this placeholder code with the actual 
-    # complex SymPy calculation from your original Flask app.py.
+def execute_calculation(
+    method: str, 
+    variable: sp.Symbol, 
+    expansion_terms: List[sp.Expr], 
+    order: int, 
+    s_component: str, 
+    c_component: str
+) -> str:
+    # Define Symbols needed by SymPy within the cached function
+    s, c, rho = sp.symbols(f'{s_component} {c_component} rho')
     
-    st.info("Simulating complex SymPy calculation...")
+    # Define a function H(s, c) for the variable
+    H_func = sp.Function(variable.name)(s, c)
     
-    # Example Calculation (Simulated result)
     if method == "Laplacian":
-        result_expr = sp.Add(*expansion_terms) + variable * (rho ** order)
-        latex_output = sp.latex(result_expr)
+        # Final expanded result (Conceptual structure based on asymptotic expansion)
+        final_result = sp.sympify(0)
         
-    else: # CurvilinearDerivative
-        result_expr = variable * sp.Function('Derivative')(rho, s) + sp.Integer(order)
-        latex_output = sp.latex(result_expr)
+        # Base Laplacian (H_ss + H_cc)
+        base_laplacian = sp.Derivative(H_func, s, 2) + sp.Derivative(H_func, c, 2)
+        final_result += base_laplacian
         
-    return latex_output
+        # Incorporate the expansion terms
+        for i in range(order + 1):
+            if i < len(expansion_terms):
+                 # Add the expansion term (this is where the actual complex logic resides)
+                 final_result += expansion_terms[i] * (rho ** i)
+
+        result_expr = final_result
+        
+    elif method == "CurvilinearDerivative":
+        # Placeholder for the Curvilinear Derivative calculation
+        result_expr = sp.Derivative(H_func, s) * c + rho
+        
+    else:
+        raise ValueError("Invalid calculation method selected.")
+
+    # Return the LaTeX representation of the final expression
+    return sp.latex(result_expr)
 
 # --- Execution Button and Result Display ---
 
@@ -91,7 +117,9 @@ if st.sidebar.button("Execute Calculation"):
                     method, 
                     variable_symbol, 
                     expansion_terms_list, 
-                    order
+                    order,
+                    s_component_str,
+                    c_component_str
                 )
 
                 st.success("Calculation Successful!")
