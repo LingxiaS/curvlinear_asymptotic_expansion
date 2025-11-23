@@ -58,20 +58,20 @@ st.header("Theory and Formula")
 st.markdown("""
 This tool performs asymptotic expansion for vector calculus operators in a curvilinear coordinate system $(\\rho, s)$, where $\\epsilon$ is the small parameter and $K(s)$ is the curvature.
 """)
-# FIX 5: Added definition for rho
+# FIX: Added definition for rho
 st.markdown(r"Here, $\rho = r/\epsilon$, where $r$ is the signed distance from the interface.")
 st.markdown("""
 The basis vectors are $\\mathbf{n}$ (normal) and $\\mathbf{s}$ (tangential).
 """)
 
 
-# FIX 4: Corrected LaTeX display for headings
+# FIX: Corrected LaTeX display for headings
 st.subheader("Curvilinear Gradient ($\nabla \\phi$):")
 st.latex(r'''
 \nabla \phi = \mathbf{n} \left(\frac{1}{\epsilon}\frac{\partial \phi}{\partial \rho}\right) + \mathbf{s} \left(\frac{1}{1 + \epsilon \rho K}\frac{\partial \phi}{\partial s}\right)
 ''')
 
-# FIX 4: Corrected LaTeX display for headings
+# FIX: Corrected LaTeX display for headings
 st.subheader("Curvilinear Divergence ($\nabla \cdot \mathbf{V}$):")
 st.latex(r'''
 \nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{1}{1 + \epsilon \rho K} \left( \frac{\partial V_s}{\partial s} + K V_n \right)
@@ -89,7 +89,7 @@ variable_name = st.sidebar.text_input(
     value="H"
 )
 
-# 2. Variable Type (No change needed)
+# 2. Variable Type 
 variable_type = st.sidebar.selectbox(
     "2. Variable Type:",
     ("Scalar", "Vector")
@@ -99,7 +99,7 @@ variable_type = st.sidebar.selectbox(
 n_component_str = "0"
 s_component_str = "0"
 
-# 3. Apply Which Expansion (FIX 3: Removed confusing LaTeX from dropdown options)
+# 3. Apply Which Expansion (FIX: Removed LaTeX/symbols from dropdown options)
 if variable_type == "Scalar":
     op_choices = ["Gradient", "Laplacian"]
 else:
@@ -161,6 +161,7 @@ if do_variable_expansion:
 
 # --- Core Execution Function ---
 
+# FIX: Added leading underscore to '_expansion_terms' to disable caching for the mutable list
 @st.cache_data
 def execute_calculation(
     op_type: str, 
@@ -168,7 +169,7 @@ def execute_calculation(
     v_type: str,
     n_comp_str: str,
     s_comp_str: str,
-    _expansion_terms: List[sp.Expr], 
+    _expansion_terms: List[sp.Expr], # Uncached parameter
     order: int
 ) -> Tuple[str, str, int]:
     
@@ -218,13 +219,29 @@ def execute_calculation(
     else:
         raise ValueError("Invalid operation/type combination.")
 
-    # 4. Final Truncation and Sorting (FIX 1: Sorting by epsilon order)
+    # 4. Final Truncation and Sorting (FIX: Enforce ascending order sorting)
     # Truncate at O(eps^(order+1))
     final_result_truncated = result_expr.subs(sp.Order(epsilon**(order + 1)), 0)
     
-    # Collect terms and explicitly sort them by power of epsilon (ascending order)
-    # The default SymPy collect/latex should now output in ascending order (small to large power)
-    sorted_result = sp.collect(final_result_truncated, epsilon)
+    # Use sp.Poly().as_expr() to force ascending order (constant term first)
+    try:
+        # Separate the n_vec and s_vec parts if present
+        if n_vec in final_result_truncated.free_symbols or s_vec in final_result_truncated.free_symbols:
+            n_part = sp.collect(final_result_truncated, n_vec).coeff(n_vec)
+            s_part = sp.collect(final_result_truncated, s_vec).coeff(s_vec)
+            
+            # Sort each part separately by epsilon power
+            n_sorted = sp.Poly(n_part.expand(), epsilon).as_expr()
+            s_sorted = sp.Poly(s_part.expand(), epsilon).as_expr()
+            
+            sorted_result = n_vec * n_sorted + s_vec * s_sorted
+        else:
+            # For scalar results, sort directly by epsilon power
+            sorted_result = sp.Poly(final_result_truncated.expand(), epsilon).as_expr()
+            
+    except Exception:
+        # Fallback if Poly conversion fails (e.g., if result is zero)
+        sorted_result = final_result_truncated
     
     return op_symbol, sp.latex(sorted_result), order
 
@@ -294,8 +311,11 @@ ex_lap_H = curvilinear_laplacian(ex_H_expanded, ex_n_vec, ex_s_vec, ex_epsilon, 
 # Final Truncation at O(eps^(2+1))
 ex_lap_H_final_truncated = ex_lap_H.subs(sp.Order(ex_epsilon**3), 0)
 
-# Collect and sort for display
-ex_lap_H_final_sorted = sp.collect(ex_lap_H_final_truncated, ex_epsilon)
+# FIX: Force ascending order sorting for example result
+try:
+    ex_lap_H_final_sorted = sp.Poly(ex_lap_H_final_truncated.expand(), ex_epsilon).as_expr()
+except Exception:
+    ex_lap_H_final_sorted = ex_lap_H_final_truncated
 
 st.subheader("Result for $\\nabla^2 H$:")
 # Append O(eps^3) to the example result display
