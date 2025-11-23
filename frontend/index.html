@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curvilinear Vector Calculus Tool</title>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; margin: 20px; line-height: 1.6; background-color: #f4f7f6; }
+        .container { max-width: 900px; margin: auto; background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h1, h2, h3 { color: #333; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 20px; }
+        .formula { font-style: italic; background-color: #e9f5ff; padding: 10px; border-radius: 4px; margin: 15px 0; overflow-x: auto; }
+        .input-group { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
+        input[type="text"], select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; transition: background-color 0.3s; }
+        button:hover { background-color: #0056b3; }
+        #result-box { margin-top: 25px; border-top: 2px solid #007bff; padding-top: 15px; }
+        #error-message { color: red; font-weight: bold; margin-top: 10px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📐 Curvilinear Vector Calculus Tool</h1>
+
+        <section id="documentation">
+            <h2>📜 Documentation and Formulas</h2>
+            <p>This tool computes vector calculus operators (Gradient, Divergence, Laplacian) in the curvilinear coordinate system $(\rho, s)$, supporting power series expansion in the small parameter $\epsilon$.</p>
+            
+            <h3>Core Formulas</h3>
+            
+            <label>1. Gradient: $\nabla \phi$</label>
+            <div class="formula">
+                $$\nabla \phi = \frac{1}{\epsilon} \frac{\partial \phi}{\partial \rho} \mathbf{\hat{n}} + \frac{1}{1 + \epsilon \rho K} \frac{\partial \phi}{\partial s} \mathbf{\hat{s}}$$
+            </div>
+
+            <label>2. Divergence: $\nabla \cdot \mathbf{V}$</label>
+            <div class="formula">
+                $$\nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{1}{1 + \epsilon \rho K} \frac{\partial V_s}{\partial s} + \frac{K V_n}{1 + \epsilon \rho K}$$
+            </div>
+            
+            <label>3. Laplacian: $\nabla^2 \phi$</label>
+            <div class="formula">
+                $$\nabla^2 \phi = \nabla \cdot (\nabla \phi)$$
+            </div>
+        </section>
+
+        <section id="demo-usage">
+            <h2>💡 Demonstration Example</h2>
+            <p>Calculate $\nabla^2 H$, where $H = K + \epsilon (-\rho K^2) + O(\epsilon^2)$.</p>
+            <ul>
+                <li><strong>Variable Symbol:</strong> <code>H</code></li>
+                <li><strong>Operation:</strong> Laplacian</li>
+                <li><strong>Expand Variable:</strong> Yes</li>
+                <li><strong>Expansion Terms (H0, H1):</strong> <code>K(s), -rho*K(s)**2</code></li>
+                <li><strong>Geometric Expansion Order:</strong> 2</li>
+            </ul>
+        </section>
+
+        <hr>
+
+        <section id="calculation-form">
+            <h2>⚙️ Input Parameters</h2>
+            <form id="calc-form">
+                
+                <div class="input-group">
+                    <label for="operation">Select Operation:</label>
+                    <select id="operation" name="operation" required>
+                        <option value="Gradient">Gradient (Scalar $\phi$)</option>
+                        <option value="Laplacian">Laplacian (Scalar $\phi$)</option>
+                        <option value="Divergence">Divergence (Vector $\mathbf{V}$)</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="variableSymbol">Variable Symbol (e.g., phi, H, V):</label>
+                    <input type="text" id="variableSymbol" name="variableSymbol" value="phi" required>
+                </div>
+                
+                <div class="input-group">
+                    <label for="order">Geometric Term $1/(1+\epsilon \rho K)$ Expansion Order (e.g., 2 $\rightarrow$ expands up to $O(\epsilon^1)$):</label>
+                    <input type="number" id="order" name="order" value="2" min="1" required>
+                </div>
+                
+                <div class="input-group">
+                    <label>Expand Variable $\phi = \phi_0 + \epsilon \phi_1 + \dots$:</label>
+                    <input type="radio" id="expand_yes" name="doVariableExpansion" value="true"> <label for="expand_yes" style="display: inline;">Yes</label>
+                    <input type="radio" id="expand_no" name="doVariableExpansion" value="false" checked> <label for="expand_no" style="display: inline;">No</label>
+                </div>
+                
+                <div class="input-group hidden" id="expansion-terms-group">
+                    <label for="expansionTerms">Variable Expansion Terms (Comma separated):</label>
+                    <p style="font-size: small; color: #888;">Enter expressions for V0, V1, V2. Example: <code>K(s), -rho*K(s)**2</code>. $K(s)$ must be written explicitly. $\rho$ is rho, $\epsilon$ is epsilon.</p>
+                    <input type="text" id="expansionTerms" name="expansionTerms" placeholder="V0, V1, V2, ...">
+                </div>
+                
+                <div class="input-group hidden" id="vector-components-group">
+                    <label for="nComponent">Normal Component $V_n$ (nComponent):</label>
+                    <input type="text" id="nComponent" name="nComponent" value="0" placeholder="e.g.: 1/epsilon * diff(phi, rho)">
+                    <label for="sComponent">Tangential Component $V_s$ (sComponent):</label>
+                    <input type="text" id="sComponent" name="sComponent" value="0" placeholder="e.g.: 1/(1+epsilon*rho*K) * diff(phi, s)">
+                    <p style="font-size: small; color: #888;">Hint: Use SymPy expression format, e.g., <code>K(s)</code>, <code>rho</code>, <code>epsilon</code>, <code>diff(phi, s)</code>, <code>sin(s)</code>.</p>
+                </div>
+
+                <button type="submit" id="calculate-btn">Execute Calculation</button>
+            </form>
+        </section>
+
+        <section id="result-box">
+            <h2>✅ Calculation Result</h2>
+            <div id="error-message"></div>
+            <div id="result-display">
+                <p>The result will be displayed here as a LaTeX formula.</p>
+                <div class="formula" id="latex-output"></div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        const form = document.getElementById('calc-form');
+        const operationSelect = document.getElementById('operation');
+        const vectorGroup = document.getElementById('vector-components-group');
+        const expansionTermsGroup = document.getElementById('expansion-terms-group');
+        const expandYes = document.getElementById('expand_yes');
+        const expandNo = document.getElementById('expand_no');
+        const errorMessage = document.getElementById('error-message');
+        const latexOutput = document.getElementById('latex-output');
+        const calculateBtn = document.getElementById('calculate-btn');
+
+        // Listener to control display of vector component inputs
+        operationSelect.addEventListener('change', () => {
+            const isDivergence = operationSelect.value === 'Divergence';
+            vectorGroup.classList.toggle('hidden', !isDivergence);
+            
+            // For Divergence, usually original variable expansion is not needed
+            if (isDivergence) {
+                expandNo.checked = true;
+                expansionTermsGroup.classList.add('hidden');
+            }
+        });
+        
+        // Listener to control display of variable expansion terms input
+        [expandYes, expandNo].forEach(radio => {
+            radio.addEventListener('change', () => {
+                const isExpanding = expandYes.checked;
+                expansionTermsGroup.classList.toggle('hidden', !isExpanding);
+            });
+        });
+        
+        // Ensure initial state is correct on load
+        operationSelect.dispatchEvent(new Event('change'));
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            errorMessage.textContent = '';
+            latexOutput.innerHTML = '';
+            calculateBtn.disabled = true;
+            calculateBtn.textContent = 'Calculating...';
+
+            const formData = new FormData(form);
+            const data = Object.fromEntries(formData.entries());
+
+            // Construct JSON payload for Flask
+            const payload = {
+                operation: data.operation,
+                variableSymbol: data.variableSymbol,
+                order: data.order,
+                doVariableExpansion: data.doVariableExpansion,
+                expansionTerms: data.expansionTerms,
+                nComponent: data.nComponent,
+                sComponent: data.sComponent,
+            };
+            
+            // !!! IMPORTANT: REPLACE THIS URL with your Render API URL in Step 4 !!!
+            // The local testing URL is provided below:
+            const apiUrl = 'http://127.0.0.1:5000/calculate'; 
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok || result.error) {
+                    throw new Error(result.error || `HTTP Error: ${response.status}`);
+                }
+
+                // Success: Display LaTeX result
+                const latexString = result.result_latex;
+                
+                // Place SymPy generated LaTeX into container
+                latexOutput.textContent = `$$${latexString}$$`;
+
+                // Tell MathJax to render the formula
+                if (window.MathJax) {
+                    MathJax.typesetPromise([latexOutput]);
+                } else {
+                    latexOutput.textContent += "\n\n(MathJax not loaded, check network or configuration)";
+                }
+
+            } catch (error) {
+                // Failure: Display error message
+                errorMessage.textContent = `Calculation Failed: ${error.message}`;
+                latexOutput.textContent = ''; 
+            } finally {
+                calculateBtn.disabled = false;
+                calculateBtn.textContent = 'Execute Calculation';
+            }
+        });
+
+    </script>
+</body>
+</html>
