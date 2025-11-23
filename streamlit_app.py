@@ -4,12 +4,10 @@ from typing import List, Union, Tuple
 
 # --- SymPy Core Calculation Functions ---
 
-# Note: The 'order' parameter is used here to limit the series expansion 
-# of (1 + epsilon*rho*K)^-1, which is the standard procedure.
-
 def curvilinear_gradient(phi, n_vec, s_vec, epsilon, rho, s, K, order):
     """Calculates the curvilinear gradient (nabla phi)."""
     grad_rho = sp.expand(n_vec * (1/epsilon) * sp.diff(phi, rho))
+    # Use .removeO() to get the explicit series expansion terms
     grad_s = sp.expand(s_vec * (1/(1 + epsilon*rho*K)).series(epsilon, 0, order).removeO() * sp.diff(phi, s))
     return sp.expand(grad_rho + grad_s)
 
@@ -28,8 +26,6 @@ def curvilinear_laplacian(phi, n_vec, s_vec, epsilon, rho, s, K, order):
     grad_phi = curvilinear_gradient(phi, n_vec, s_vec, epsilon, rho, s, K, order)
     
     # 2. Extract n and s components of grad(phi)
-    # This requires substituting the vector basis symbols
-    # Assuming n_vec and s_vec are linearly independent symbols
     n_comp_grad = grad_phi.subs({s_vec: 0, n_vec: 1}) 
     s_comp_grad = grad_phi.subs({s_vec: 1, n_vec: 0})
     
@@ -52,10 +48,10 @@ st.header("Theory and Formula")
 st.markdown("""
 This tool performs asymptotic expansion for vector calculus operators in a curvilinear coordinate system $(\\rho, s)$, where $\\epsilon$ is the small parameter and $K(s)$ is the curvature.
 
-The basis vectors are $\\mathbf{n}$ (normal) and $\\mathbf{s}$ (tangential). The expansion relies on the coordinate transformation properties.
+The basis vectors are $\\mathbf{n}$ (normal) and $\\mathbf{s}$ (tangential).
 """)
 
-st.subheader("Curvilinear Gradient ($\nabla \phi$):")
+st.subheader("Curvilinear Gradient ($\nabla \\phi$):")
 st.latex(r'''
 \nabla \phi = \mathbf{n} \left(\frac{1}{\epsilon}\frac{\partial \phi}{\partial \rho}\right) + \mathbf{s} \left(\frac{1}{1 + \epsilon \rho K}\frac{\partial \phi}{\partial s}\right)
 ''')
@@ -64,7 +60,7 @@ st.subheader("Curvilinear Divergence ($\nabla \cdot \mathbf{V}$):")
 st.latex(r'''
 \nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{\partial V_s}{\partial s} + K V_n
 ''')
-st.caption("Where $\\mathbf{V} = V_n \mathbf{n} + V_s \mathbf{s}$.")
+st.caption("Where $\\mathbf{V} = V_n \\mathbf{n} + V_s \\mathbf{s}$.")
 st.markdown("---")
 
 
@@ -95,6 +91,8 @@ operation = st.sidebar.selectbox(
 )
 
 # 4. Vector Components (if Vector type is chosen)
+n_component_str = "0"
+s_component_str = "0"
 if variable_type == "Vector ($\mathbf{V}$)":
     st.sidebar.subheader("Vector Components")
     n_component_str = st.sidebar.text_input(
@@ -113,34 +111,31 @@ order = st.sidebar.number_input(
     value=2
 )
 
-# 6. Variable Expansion (H = H0 + eps*H1 + ...)
+# 6. Variable Expansion 
 st.sidebar.markdown("---")
 st.sidebar.subheader("Variable Expansion")
 
-# Checkbox to use expansion
 do_variable_expansion = st.sidebar.checkbox(
     f"5. Expand {variable_name} in $\\epsilon$", 
     True, 
     help="If checked, the variable is replaced by a user-defined series expansion."
 )
 
+expansion_terms: List[sp.Expr] = []
 if do_variable_expansion:
     expansion_terms_area = st.sidebar.text_area(
         "Expansion Terms (comma-separated, $V_0, V_1, ...$):",
         value="K(s), -rho * K(s)**2",
         help="Terms $V_0, V_1, ...$ corresponding to $\\epsilon^0, \\epsilon^1, ...$"
     )
-    # Parse expansion terms (V0, V1, V2, ...)
     try:
-        expansion_terms: List[sp.Expr] = [sp.sympify(t.strip()) for t in expansion_terms_area.split(',')]
+        expansion_terms = [sp.sympify(t.strip()) for t in expansion_terms_area.split(',')]
     except Exception:
-        st.error("Error parsing Expansion Terms. Ensure they are valid SymPy expressions.")
-        st.stop()
-else:
-    expansion_terms: List[sp.Expr] = []
+        # Error will be caught during final execution
+        pass 
 
 
-# --- Core Execution Function ---
+# --- Core Execution Function (with UnhashableParamError fix) ---
 
 @st.cache_data
 def execute_calculation(
@@ -149,21 +144,20 @@ def execute_calculation(
     v_type: str,
     n_comp_str: str,
     s_comp_str: str,
-    expansion_terms: List[sp.Expr], 
+    _expansion_terms: List[sp.Expr], # FIX: Underscore to disable Streamlit hashing
     order: int
 ) -> Tuple[str, str]:
     
     # 1. Define base symbols
     rho, s, epsilon = sp.symbols('rho s epsilon')
     K = sp.Function('K')(s)
-    n_vec, s_vec = sp.symbols('n_vec s_vec') # Basis vectors as symbols
+    n_vec, s_vec = sp.symbols('n_vec s_vec')
 
     # 2. Define the Variable (H or V)
     if v_type == "Scalar ($\phi$)":
-        # If expanded, use the series; otherwise use the function form
-        if expansion_terms:
+        if _expansion_terms:
             phi = sp.sympify(0)
-            for i, term in enumerate(expansion_terms):
+            for i, term in enumerate(_expansion_terms):
                 phi += term * (epsilon ** i)
         else:
             phi = sp.Function(variable_name)(rho, s)
@@ -171,11 +165,13 @@ def execute_calculation(
         target_expr = phi
         
     elif v_type == "Vector ($\mathbf{V}$)":
-        # Vector components V_n and V_s
         Vn = sp.sympify(n_comp_str)
         Vs = sp.sympify(s_comp_str)
         target_expr = Vn * n_vec + Vs * s_vec
         
+    else:
+        raise ValueError("Invalid variable type.")
+
     # 3. Perform the calculation based on the selected operator
     if op_type == "Gradient ($\nabla$)" and v_type == "Scalar ($\phi$)":
         result_expr = curvilinear_gradient(target_expr, n_vec, s_vec, epsilon, rho, s, K, order)
@@ -210,22 +206,22 @@ if st.sidebar.button("Execute Calculation"):
     else:
         with st.spinner(f"Calculating {operation} of {variable_name}..."):
             try:
-                # Execute the core function
-                op_symbol, latex_result = execute_calculation(
+                # Call core calculation function (using expansion_terms_list for the cached argument)
+                latex_result = execute_calculation(
                     operation, 
                     variable_name,
                     variable_type,
                     n_component_str if variable_type == "Vector ($\mathbf{V}$)" else "0",
                     s_component_str if variable_type == "Vector ($\mathbf{V}$)" else "0",
-                    expansion_terms, 
+                    expansion_terms, # This maps to _expansion_terms
                     order
                 )
 
-                st.success(f"Calculation Successful for ${op_symbol}$")
+                st.success(f"Calculation Successful for ${latex_result[0]}$")
                 
                 # Display result
-                st.subheader(f"Expanded Form of ${op_symbol}$:")
-                st.latex(latex_result)
+                st.subheader(f"Expanded Form of ${latex_result[0]}$:")
+                st.latex(latex_result[1])
                 
             except Exception as e:
                 st.error(f"Calculation Failed: Check your input expressions.")
@@ -251,6 +247,7 @@ This demo replicates a common use case where the variable $H$ is expanded to fir
 ex_rho, ex_s, ex_epsilon = sp.symbols('rho s epsilon')
 ex_K = sp.Function('K')(ex_s)
 
+# Expansion: H0 + eps*H1
 ex_H_0 = ex_K
 ex_H_1 = -ex_rho * ex_K**2
 ex_H_expanded = ex_H_0 + ex_H_1 * ex_epsilon + sp.Order(ex_epsilon**3)
