@@ -157,3 +157,4 @@ if __name__ == '__main__':
 def health_check():
     # Return a simple JSON response to confirm the service is running
     return jsonify({'status': 'API Running', 'version': '1.0'})
+
