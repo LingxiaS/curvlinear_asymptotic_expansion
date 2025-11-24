@@ -74,7 +74,7 @@ st.latex(r'''
 # FIX: Corrected LaTeX display for headings
 st.subheader("Curvilinear Divergence:")
 st.latex(r'''
-\nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{\partial V_s}{\partial \s} + \frac{1}{1 + \epsilon \rho K} \left( \frac{\partial V_s}{\partial s} + K V_n \right)
+\nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{\partial V_s}{\partial s} + \frac{1}{1 + \epsilon \rho K} K V_n 
 ''')
 st.caption("Where $\\mathbf{V} = V_n \\mathbf{n} + V_s \\mathbf{s}$.")
 st.markdown("---")
