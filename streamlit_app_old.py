@@ -4,11 +4,9 @@ from typing import List, Union, Tuple
 
 # --- SymPy Core Calculation Functions (STRICTLY AS PROVIDED BY USER) ---
 
-# NOTE: The core functions are preserved as per user requirement, but we will 
-# rely on the final sp.series() call in execute_calculation for sorting/truncation.
-
 def curvilinear_gradient(phi, n_vec, s_vec, epsilon, rho, s, K, order):
     """Calculates the curvilinear gradient (nabla phi). Order in series is user_order + 1."""
+    # Ensure series order is user_order + 1 for accuracy up to user_order
     series_order = order + 1 
     
     grad_rho = sp.expand(n_vec * (1/epsilon) * sp.diff(phi, rho))
@@ -20,6 +18,7 @@ def curvilinear_gradient(phi, n_vec, s_vec, epsilon, rho, s, K, order):
 
 def curvilinear_divergence(n_component, s_component, epsilon, rho, s, K, order):
     """Calculates the curvilinear divergence (div(V)). Order in series is user_order + 1."""
+    # Ensure series order is user_order + 1 for accuracy up to user_order
     series_order = order + 1
     
     n_dot_vec = n_component
@@ -27,7 +26,7 @@ def curvilinear_divergence(n_component, s_component, epsilon, rho, s, K, order):
     
     term1 = sp.expand((1/epsilon) * sp.diff(n_dot_vec, rho))
     # Using the user-specified series order for the term: (1/(1 + epsilon*rho*K))
-    term2 = sp.expand( sp.diff(s_dot_vec, s))
+    term2 = sp.expand( (1/(1 + epsilon*rho*K)).series(epsilon, 0, series_order) * sp.diff(s_dot_vec, s))
     term3 = sp.expand((1/(1 + epsilon*rho*K)).series(epsilon, 0, series_order) * K * n_dot_vec)
     
     div = sp.collect(term1 + term2 + term3, epsilon)
@@ -35,6 +34,7 @@ def curvilinear_divergence(n_component, s_component, epsilon, rho, s, K, order):
 
 def curvilinear_laplacian(phi, n_vec, s_vec, epsilon, rho, s, K, order):
     """Calculates the curvilinear Laplacian (nabla^2 phi)."""
+    # The order passed to sub-functions is the user's intended final order.
     grad_phi = curvilinear_gradient(phi, n_vec, s_vec, epsilon, rho, s, K, order)
     
     n_comp_grad = grad_phi.subs({s_vec: 0, n_vec: 1}) 
@@ -58,23 +58,23 @@ st.header("Theory and Formula")
 st.markdown("""
 This tool performs asymptotic expansion for vector calculus operators in a curvilinear coordinate system $(\\rho, s)$, where $\\epsilon$ is the small parameter and $K(s)$ is the curvature.
 """)
-# FIX: Added definition for rho
+# FIX 5: Added definition for rho
 st.markdown(r"Here, $\rho = r/\epsilon$, where $r$ is the signed distance from the interface.")
 st.markdown("""
 The basis vectors are $\\mathbf{n}$ (normal) and $\\mathbf{s}$ (tangential).
 """)
 
 
-# FIX: Corrected LaTeX display for headings
-st.subheader("Curvilinear Gradient:")
+# FIX 4: Corrected LaTeX display for headings
+st.subheader("Curvilinear Gradient ($\nabla \\phi$):")
 st.latex(r'''
 \nabla \phi = \mathbf{n} \left(\frac{1}{\epsilon}\frac{\partial \phi}{\partial \rho}\right) + \mathbf{s} \left(\frac{1}{1 + \epsilon \rho K}\frac{\partial \phi}{\partial s}\right)
 ''')
 
-# FIX: Corrected LaTeX display for headings
-st.subheader("Curvilinear Divergence:")
+# FIX 4: Corrected LaTeX display for headings
+st.subheader("Curvilinear Divergence ($\nabla \cdot \mathbf{V}$):")
 st.latex(r'''
-\nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{\partial V_s}{\partial \s} + \frac{1}{1 + \epsilon \rho K} \left( \frac{\partial V_s}{\partial s} + K V_n \right)
+\nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{1}{1 + \epsilon \rho K} \left( \frac{\partial V_s}{\partial s} + K V_n \right)
 ''')
 st.caption("Where $\\mathbf{V} = V_n \\mathbf{n} + V_s \\mathbf{s}$.")
 st.markdown("---")
@@ -89,7 +89,7 @@ variable_name = st.sidebar.text_input(
     value="H"
 )
 
-# 2. Variable Type 
+# 2. Variable Type (No change needed)
 variable_type = st.sidebar.selectbox(
     "2. Variable Type:",
     ("Scalar", "Vector")
@@ -99,7 +99,7 @@ variable_type = st.sidebar.selectbox(
 n_component_str = "0"
 s_component_str = "0"
 
-# 3. Apply Which Expansion (FIX: Removed LaTeX/symbols from dropdown options)
+# 3. Apply Which Expansion (FIX 3: Removed confusing LaTeX from dropdown options)
 if variable_type == "Scalar":
     op_choices = ["Gradient", "Laplacian"]
 else:
@@ -133,7 +133,7 @@ if variable_type == "Vector":
 order = st.sidebar.number_input(
     "4. Expansion Order (n, result up to $\\epsilon^n$):",
     min_value=0,
-    value=1
+    value=2
 )
 
 # 6. Variable Expansion 
@@ -158,9 +158,9 @@ if do_variable_expansion:
     except Exception:
         pass 
 
+
 # --- Core Execution Function ---
 
-# FIX: Added leading underscore to '_expansion_terms' to avoid UnHashableParamError
 @st.cache_data
 def execute_calculation(
     op_type: str, 
@@ -168,7 +168,7 @@ def execute_calculation(
     v_type: str,
     n_comp_str: str,
     s_comp_str: str,
-    _expansion_terms: List[sp.Expr], # Uncached parameter
+    _expansion_terms: List[sp.Expr], 
     order: int
 ) -> Tuple[str, str, int]:
     
@@ -182,10 +182,13 @@ def execute_calculation(
     # 2. Define the Variable (H or V)
     if v_type == "Scalar":
         if _expansion_terms:
-            # Construct expression. We do NOT add sp.Order() here.
+            # Construct expression and add Order term for correct SymPy series handling
             phi = sp.sympify(0)
             for i, term in enumerate(_expansion_terms):
                 phi += term * (epsilon ** i)
+            # Add O(eps^(order+1)) to ensure the result is correctly truncated at order 'order'
+            if len(_expansion_terms) <= order + 1:
+                 phi += sp.Order(epsilon**(order + 1))
         else:
             phi = sp.Function(variable_name)(rho, s)
             
@@ -215,30 +218,13 @@ def execute_calculation(
     else:
         raise ValueError("Invalid operation/type combination.")
 
-    # 4. Final Truncation and Sorting (FIX: Use sp.series().removeO() for guaranteed sorting)
-    # The order passed to series is the truncation order (exclusive, i.e., removes O(eps^(order+1)))
+    # 4. Final Truncation and Sorting (FIX 1: Sorting by epsilon order)
+    # Truncate at O(eps^(order+1))
+    final_result_truncated = result_expr.subs(sp.Order(epsilon**(order + 1)), 0)
     
-    try:
-        # Separate the n_vec and s_vec parts if present
-        if n_vec in result_expr.free_symbols or s_vec in result_expr.free_symbols:
-            # Must expand first to separate components cleanly
-            expanded_expr = result_expr.expand() 
-            
-            n_part_expr = sp.collect(expanded_expr, n_vec).coeff(n_vec)
-            s_part_expr = sp.collect(expanded_expr, s_vec).coeff(s_vec)
-            
-            # Apply series expansion to each component for sorting and truncation
-            n_sorted = n_part_expr.series(epsilon, 0, order + 1).removeO()
-            s_sorted = s_part_expr.series(epsilon, 0, order + 1).removeO()
-            
-            sorted_result = n_vec * n_sorted + s_vec * s_sorted
-        else:
-            # For scalar results, apply series expansion directly
-            sorted_result = result_expr.series(epsilon, 0, order + 1).removeO()
-            
-    except Exception:
-        # Fallback if series fails (e.g., if result is complex or 0)
-        sorted_result = result_expr.subs(sp.Order(epsilon**(order + 1)), 0)
+    # Collect terms and explicitly sort them by power of epsilon (ascending order)
+    # The default SymPy collect/latex should now output in ascending order (small to large power)
+    sorted_result = sp.collect(final_result_truncated, epsilon)
     
     return op_symbol, sp.latex(sorted_result), order
 
@@ -287,7 +273,7 @@ This demo replicates a common use case where the variable $H$ is expanded up to 
 **Inputs used in this example:**
 * **Variable Name:** H
 * **Variable Type:** Scalar
-* **Operator:** Laplacian 
+* **Operator:** Laplacian ($\nabla^2$) 
 * **Expansion Order:** 2
 * **Expansion Terms:** `K(s)`, `-rho * K(s)**2` (i.e., $H_0 = K(s)$, $H_1 = -\\rho K(s)^2$)
 """)
@@ -297,16 +283,19 @@ ex_rho, ex_s, ex_epsilon = sp.symbols('rho s epsilon')
 ex_K = sp.Function('K')(ex_s)
 ex_n_vec, ex_s_vec = sp.symbols(r'\mathbf{n} \mathbf{s}') 
 
-# Expansion: H0 + eps*H1 (Do NOT add sp.Order here)
+# Expansion: H0 + eps*H1
 ex_H_0 = ex_K
 ex_H_1 = -ex_rho * ex_K**2
-ex_H_expanded = ex_H_0 + ex_H_1 * ex_epsilon 
+# Ensure expansion is done to O(eps^(2+1)) for accurate Laplacian calculation (order=2)
+ex_H_expanded = ex_H_0 + ex_H_1 * ex_epsilon + sp.Order(ex_epsilon**(2+1)) 
 
 # Calculate the Laplacian of the expanded H (using order=2)
 ex_lap_H = curvilinear_laplacian(ex_H_expanded, ex_n_vec, ex_s_vec, ex_epsilon, ex_rho, ex_s, ex_K, 2)
+# Final Truncation at O(eps^(2+1))
+ex_lap_H_final_truncated = ex_lap_H.subs(sp.Order(ex_epsilon**3), 0)
 
-# FIX: Use series().removeO() for guaranteed sorting and truncation
-ex_lap_H_final_sorted = ex_lap_H.series(ex_epsilon, 0, 3).removeO()
+# Collect and sort for display
+ex_lap_H_final_sorted = sp.collect(ex_lap_H_final_truncated, ex_epsilon)
 
 st.subheader("Result for $\\nabla^2 H$:")
 # Append O(eps^3) to the example result display
