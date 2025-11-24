@@ -27,7 +27,7 @@ def curvilinear_divergence(n_component, s_component, epsilon, rho, s, K, order):
     
     term1 = sp.expand((1/epsilon) * sp.diff(n_dot_vec, rho))
     # Using the user-specified series order for the term: (1/(1 + epsilon*rho*K))
-    term2 = sp.expand( sp.diff(s_dot_vec, s))
+    term2 = sp.expand( (1/(1 + epsilon*rho*K)).series(epsilon, 0, series_order) * sp.diff(s_dot_vec, s))
     term3 = sp.expand((1/(1 + epsilon*rho*K)).series(epsilon, 0, series_order) * K * n_dot_vec)
     
     div = sp.collect(term1 + term2 + term3, epsilon)
@@ -74,7 +74,7 @@ st.latex(r'''
 # FIX: Corrected LaTeX display for headings
 st.subheader("Curvilinear Divergence:")
 st.latex(r'''
-\nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{\partial V_s}{\partial \s} + \frac{1}{1 + \epsilon \rho K} \left( \frac{\partial V_s}{\partial s} + K V_n \right)
+\nabla \cdot \mathbf{V} = \frac{1}{\epsilon} \frac{\partial V_n}{\partial \rho} + \frac{1}{1 + \epsilon \rho K} \left( \frac{\partial V_s}{\partial s} + K V_n \right)
 ''')
 st.caption("Where $\\mathbf{V} = V_n \\mathbf{n} + V_s \\mathbf{s}$.")
 st.markdown("---")
